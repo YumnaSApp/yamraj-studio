@@ -1,9 +1,12 @@
 import { requireOptionalNativeModule } from 'expo';
 
 export type HindiVoice = { id: string; name: string; gender: 'male' | 'female' | 'other'; enhanced: boolean };
-export type ExportClip = { path: string; text: string; speaker: string; duration: number };
+export type ExportClip = { path: string; text: string; speaker: string; duration: number; start?: number };
 export type ExportOptions = {
   image?: string | null;
+  video?: string | null;
+  videoDuration?: number;
+  videoVolume?: number;
   clips: ExportClip[];
   music: 'None' | 'Funny' | 'Horror' | 'Dramatic';
   musicVolume: number;
@@ -31,6 +34,7 @@ type NativeModuleType = {
   playMusic(kind: string): Promise<void>;
   playSFX(kind: string): Promise<void>;
   pickImage(): Promise<string | null>;
+  pickVideo(): Promise<{ path: string; duration: number; thumbnail: string } | null>;
   exportVideo(options: ExportOptions): Promise<{ path: string; absolutePath: string; duration: number }>;
   proStatus(): Promise<{ isPro: boolean; price: string }>;
   buyPro(): Promise<{ isPro: boolean; message: string }>;

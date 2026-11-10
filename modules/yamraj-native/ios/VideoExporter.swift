@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreImage
 import UIKit
 
 struct ExportClip: Hashable {
@@ -6,6 +7,7 @@ struct ExportClip: Hashable {
     let text: String
     let speaker: String
     let duration: Double
+    var start: Double? = nil      // manual start time on the timeline (seconds)
 }
 
 struct SFXCue: Identifiable, Hashable {
@@ -28,6 +30,9 @@ struct ExportSettings {
     var endCard = true
     var endCardHandle = "@KKClipRush"
     var watermark = true          // free version only
+    var videoURL: URL? = nil      // user's own video as background
+    var videoDuration: Double = 0
+    var videoVolume: Float = 0.5
 
     static let leadIn = 0.3
     static let tail = 0.6
@@ -38,14 +43,16 @@ struct ExportSettings {
         var t = Self.leadIn
         var result: [Double] = []
         for c in clips {
-            result.append(t)
-            t += c.duration + gap
+            let st = c.start ?? t
+            result.append(st)
+            t = st + c.duration + gap
         }
         return result
     }
     var contentLength: Double {
-        guard !clips.isEmpty else { return 5 }
-        return (clipStarts.last ?? 0) + (clips.last?.duration ?? 0) + Self.tail
+        let voicesEnd = zip(clipStarts, clips).map { $0 + $1.duration }.max().map { $0 + Self.tail } ?? 0
+        if videoURL != nil { return max(voicesEnd, videoDuration, 1) }
+        return clips.isEmpty ? 5 : voicesEnd
     }
     var totalLength: Double { contentLength + (endCard ? Self.endCardLength : 0) }
 }
@@ -101,7 +108,9 @@ enum VideoExporter {
         guard writer.startWriting() else { throw ExportError.writer(writer.error?.localizedDescription ?? "start") }
         writer.startSession(atSourceTime: .zero)
 
-        let renderer = FrameRenderer(settings: s, size: size)
+        var videoSource: VideoFrameSource? = nil
+        if let v = s.videoURL { videoSource = try await VideoFrameSource.make(url: v) }
+        let renderer = FrameRenderer(settings: s, size: size, video: videoSource)
         let frameCount = Int((s.totalLength * Double(fps)).rounded(.up))
 
         for f in 0..<frameCount {
@@ -172,6 +181,10 @@ enum VideoExporter {
             params.append(p)
         }
 
+        // original sound of the user's video (looped under the content)
+        if let v = s.videoURL, s.videoVolume > 0.001 {
+            try await addAudio(v, at: 0, volume: s.videoVolume, loop: true, fadeOut: false)
+        }
         // voices
         for (clip, start) in zip(s.clips, s.clipStarts) {
             try await addAudio(clip.url, at: start, volume: s.voiceVolume)
@@ -213,7 +226,10 @@ final class FrameRenderer {
     private let starts: [Double]
     private let wordTimes: [[(word: String, start: Double, end: Double)]]
 
-    init(settings: ExportSettings, size: CGSize) {
+    let video: VideoFrameSource?
+
+    init(settings: ExportSettings, size: CGSize, video: VideoFrameSource? = nil) {
+        self.video = video
         self.s = settings
         self.size = size
         self.background = FrameRenderer.prepareBackground(settings.image, size: size)
@@ -263,11 +279,19 @@ final class FrameRenderer {
             return
         }
 
-        // slow zoom (Ken Burns)
-        let progress = min(1, t / max(1, s.contentLength))
-        let zoom = 1.0 + 0.08 * progress
-        let w = size.width * zoom, h = size.height * zoom
-        background.draw(in: CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h))
+        if let video, let frame = video.image(at: t) {
+            // user's video, aspect-fill into 9:16
+            let iw = CGFloat(frame.width), ih = CGFloat(frame.height)
+            let scale = max(size.width / iw, size.height / ih)
+            let w = iw * scale, h = ih * scale
+            UIImage(cgImage: frame).draw(in: CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h))
+        } else {
+            // slow zoom (Ken Burns)
+            let progress = min(1, t / max(1, s.contentLength))
+            let zoom = 1.0 + 0.08 * progress
+            let w = size.width * zoom, h = size.height * zoom
+            background.draw(in: CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h))
+        }
 
         // dark gradient at bottom so captions pop
         let colors = [UIColor.clear.cgColor, UIColor.black.withAlphaComponent(0.55).cgColor] as CFArray
@@ -419,5 +443,78 @@ enum LavaArt {
 
     static func image(size: CGSize = CGSize(width: 540, height: 960)) -> UIImage {
         UIGraphicsImageRenderer(size: size).image { draw(in: $0.cgContext, size: size) }
+    }
+}
+
+
+// MARK: - Reads frames of the user's video, in order, looping if needed
+
+final class VideoFrameSource {
+    private let asset: AVURLAsset
+    private let track: AVAssetTrack
+    private let transform: CGAffineTransform
+    let duration: Double
+    private var reader: AVAssetReader?
+    private var output: AVAssetReaderTrackOutput?
+    private var pending: CMSampleBuffer?
+    private var current: CGImage?
+    private var lastLocal = -1.0
+    private let ci = CIContext(options: [.cacheIntermediates: false])
+
+    /// Turn the track's rotation into an image orientation (iPhone videos are often stored rotated)
+    private var orientation: CGImagePropertyOrientation {
+        let angle = atan2(transform.b, transform.a)
+        switch angle {
+        case let a where abs(a - .pi / 2) < 0.1: return .right
+        case let a where abs(a + .pi / 2) < 0.1: return .left
+        case let a where abs(abs(a) - .pi) < 0.1: return .down
+        default: return .up
+        }
+    }
+
+    private init(asset: AVURLAsset, track: AVAssetTrack, transform: CGAffineTransform, duration: Double) {
+        self.asset = asset; self.track = track; self.transform = transform; self.duration = duration
+    }
+
+    static func make(url: URL) async throws -> VideoFrameSource? {
+        let asset = AVURLAsset(url: url)
+        guard let track = try await asset.loadTracks(withMediaType: .video).first else { return nil }
+        let transform = try await track.load(.preferredTransform)
+        let duration = try await asset.load(.duration).seconds
+        let src = VideoFrameSource(asset: asset, track: track, transform: transform, duration: duration)
+        try src.restart()
+        return src
+    }
+
+    private func restart() throws {
+        reader?.cancelReading()
+        let r = try AVAssetReader(asset: asset)
+        let o = AVAssetReaderTrackOutput(track: track, outputSettings: [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+        ])
+        o.alwaysCopiesSampleData = false
+        if r.canAdd(o) { r.add(o) }
+        r.startReading()
+        reader = r; output = o; pending = nil
+    }
+
+    /// Frame to show at timeline time t (seconds).
+    func image(at t: Double) -> CGImage? {
+        guard duration > 0.05 else { return current }
+        let local = t.truncatingRemainder(dividingBy: duration)
+        if local < lastLocal { try? restart() }      // looped
+        lastLocal = local
+        while true {
+            if pending == nil { pending = output?.copyNextSampleBuffer() }
+            guard let sb = pending else { break }
+            let pts = CMSampleBufferGetPresentationTimeStamp(sb).seconds
+            if pts > local + 0.0001, current != nil { break }
+            if let pb = CMSampleBufferGetImageBuffer(sb) {
+                let img = CIImage(cvPixelBuffer: pb).oriented(orientation)
+                if let cg = ci.createCGImage(img, from: img.extent) { current = cg }
+            }
+            pending = nil
+        }
+        return current
     }
 }

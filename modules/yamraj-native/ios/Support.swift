@@ -3,6 +3,7 @@ import UIKit
 import PhotosUI
 import AVFoundation
 import StoreKit
+import UniformTypeIdentifiers
 
 // MARK: - Files on disk
 
@@ -21,6 +22,7 @@ enum FileStore {
     static var audio: URL  { folder(documents, "Audio") }
     static var videos: URL { folder(documents, "Videos") }
     static var images: URL { folder(documents, "Images") }
+    static var media: URL  { folder(documents, "Media") }
     static var synth: URL  { folder(caches, "Synth") }
     static var temp: URL   { folder(caches, "Temp") }
 
@@ -165,5 +167,70 @@ final class ProStore {
         try? await AppStore.sync()
         await refresh()
         return isPro ? "👑 Pro restored." : "No Pro purchase found on this Apple ID."
+    }
+}
+
+
+// MARK: - Video picker (user's own clip as background)
+
+final class VideoPicker: NSObject, PHPickerViewControllerDelegate {
+    private var continuation: CheckedContinuation<String?, Never>?
+    private static var current: VideoPicker?
+
+    @MainActor
+    static func pick(from presenter: UIViewController?) async -> String? {
+        guard let presenter else { return nil }
+        let picker = VideoPicker()
+        current = picker
+        return await withCheckedContinuation { cont in
+            picker.continuation = cont
+            var config = PHPickerConfiguration()
+            config.filter = .videos
+            config.selectionLimit = 1
+            config.preferredAssetRepresentationMode = .current
+            let vc = PHPickerViewController(configuration: config)
+            vc.delegate = picker
+            presenter.present(vc, animated: true)
+        }
+    }
+
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        guard let provider = results.first?.itemProvider,
+              provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) else { finish(nil); return }
+        provider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] url, _ in
+            guard let url else { self?.finish(nil); return }
+            let ext = url.pathExtension.isEmpty ? "mov" : url.pathExtension
+            let name = "Media/vid_\(UUID().uuidString).\(ext)"
+            _ = FileStore.media
+            let dest = FileStore.documents.appendingPathComponent(name)
+            do { try FileManager.default.copyItem(at: url, to: dest); self?.finish(name) }
+            catch { self?.finish(nil) }
+        }
+    }
+
+    private func finish(_ value: String?) {
+        continuation?.resume(returning: value)
+        continuation = nil
+        VideoPicker.current = nil
+    }
+}
+
+enum VideoInfo {
+    /// Duration + a JPEG thumbnail saved next to the video. Returns (duration, thumbnail relative path).
+    static func inspect(_ relative: String) async -> (Double, String?) {
+        let url = FileStore.resolve(relative)
+        let asset = AVURLAsset(url: url)
+        let duration = (try? await asset.load(.duration).seconds) ?? 0
+        let gen = AVAssetImageGenerator(asset: asset)
+        gen.appliesPreferredTrackTransform = true
+        gen.maximumSize = CGSize(width: 540, height: 960)
+        var thumb: String?
+        if let cg = try? await gen.image(at: CMTime(seconds: min(1, duration / 2), preferredTimescale: 600)).image,
+           let data = UIImage(cgImage: cg).jpegData(compressionQuality: 0.8) {
+            let name = relative + ".jpg"
+            if (try? data.write(to: FileStore.documents.appendingPathComponent(name))) != nil { thumb = name }
+        }
+        return (duration, thumb)
     }
 }

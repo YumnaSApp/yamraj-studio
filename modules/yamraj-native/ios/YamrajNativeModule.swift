@@ -84,6 +84,13 @@ public class YamrajNativeModule: Module {
             return await ImagePicker.pick(from: presenter)
         }
 
+        AsyncFunction("pickVideo") { () async -> [String: Any]? in
+            let presenter = await MainActor.run { self.appContext?.utilities?.currentViewController() }
+            guard let path = await VideoPicker.pick(from: presenter) else { return nil }
+            let (duration, thumb) = await VideoInfo.inspect(path)
+            return ["path": path, "duration": duration, "thumbnail": thumb ?? ""]
+        }
+
         // ---------- export ----------
         Events("onExportProgress")
 
@@ -99,7 +106,8 @@ public class YamrajNativeModule: Module {
                 return ExportClip(url: FileStore.resolve(p),
                                   text: c["text"] as? String ?? "",
                                   speaker: c["speaker"] as? String ?? "",
-                                  duration: (c["duration"] as? NSNumber)?.doubleValue ?? 1)
+                                  duration: (c["duration"] as? NSNumber)?.doubleValue ?? 1,
+                                  start: (c["start"] as? NSNumber)?.doubleValue)
             }
             var s = ExportSettings(image: image, clips: clips)
             s.music = MusicKind(rawValue: options["music"] as? String ?? "None") ?? .none
@@ -115,6 +123,17 @@ public class YamrajNativeModule: Module {
             s.endCard = options["endCard"] as? Bool ?? true
             s.endCardHandle = options["endCardHandle"] as? String ?? ""
             s.watermark = options["watermark"] as? Bool ?? true
+            if let v = options["video"] as? String, !v.isEmpty {
+                let url = FileStore.resolve(v)
+                s.videoURL = url
+                if let d = (options["videoDuration"] as? NSNumber)?.doubleValue, d > 0 {
+                    s.videoDuration = d
+                } else {
+                    let d = try? await AVURLAsset(url: url).load(.duration)
+                    s.videoDuration = d?.seconds ?? 0
+                }
+                s.videoVolume = (options["videoVolume"] as? NSNumber)?.floatValue ?? 0.5
+            }
 
             let url = try await VideoExporter.export(s) { [weak self] p in
                 self?.sendEvent("onExportProgress", ["progress": p])
