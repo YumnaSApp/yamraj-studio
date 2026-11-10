@@ -19,6 +19,12 @@
     },
     "android": {
       "package": "com.kamran.yamrajstudio"
+    },
+    "owner": "kamran28s-team",
+    "extra": {
+      "eas": {
+        "projectId": "a0d22fd3-dd08-4587-bb89-55c7dcbaa86b"
+      }
     }
   }
 }
