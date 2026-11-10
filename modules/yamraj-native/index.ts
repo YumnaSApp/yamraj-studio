@@ -1,0 +1,41 @@
+import { requireNativeModule } from 'expo';
+
+export type HindiVoice = { id: string; name: string; gender: 'male' | 'female' | 'other'; enhanced: boolean };
+export type ExportClip = { path: string; text: string; speaker: string; duration: number };
+export type ExportOptions = {
+  image?: string | null;
+  clips: ExportClip[];
+  music: 'None' | 'Funny' | 'Horror' | 'Dramatic';
+  musicVolume: number;
+  voiceVolume: number;
+  sfx: { kind: string; time: number }[];
+  captions: boolean;
+  showSpeaker: boolean;
+  hookText: string;
+  endCard: boolean;
+  endCardHandle: string;
+  watermark: boolean;
+};
+
+type NativeModuleType = {
+  documentsPath(): string;
+  readJSON(name: string): string | null;
+  writeJSON(name: string, text: string): boolean;
+  deleteFile(path: string): void;
+  hindiVoices(): HindiVoice[];
+  speak(text: string, pitch: number, rate: number, voiceId: string | null, preferMale: boolean): void;
+  stopSpeaking(): void;
+  renderSpeech(text: string, pitch: number, rate: number, voiceId: string | null, preferMale: boolean, echo: boolean): Promise<{ path: string; duration: number }>;
+  playFile(path: string): void;
+  stopPlayback(): void;
+  playMusic(kind: string): Promise<void>;
+  playSFX(kind: string): Promise<void>;
+  pickImage(): Promise<string | null>;
+  exportVideo(options: ExportOptions): Promise<{ path: string; absolutePath: string; duration: number }>;
+  proStatus(): Promise<{ isPro: boolean; price: string }>;
+  buyPro(): Promise<{ isPro: boolean; message: string }>;
+  restorePro(): Promise<{ isPro: boolean; message: string }>;
+  addListener(event: 'onExportProgress', listener: (e: { progress: number }) => void): { remove(): void };
+};
+
+export default requireNativeModule<NativeModuleType>('YamrajNative');

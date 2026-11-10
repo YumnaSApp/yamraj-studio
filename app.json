@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Yamraj Studio",
+    "slug": "yamraj-studio",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0a080a",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.kamran.yamrajstudio",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Pick a picture for your Short",
+        "NSPhotoLibraryAddUsageDescription": "Save your Shorts to Photos",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.kamran.yamrajstudio"
+    }
+  }
+}
