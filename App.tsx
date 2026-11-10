@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import Native from './modules/yamraj-native';
+import Native, { nativeReady } from './modules/yamraj-native';
 import { AppData, loadData, saveData } from './src/data';
 import { C } from './src/ui';
 import HomeScreen from './src/screens/HomeScreen';
@@ -34,11 +34,12 @@ export type Store = {
 
 export default function App() {
   const [stack, setStack] = useState<Route[]>([{ name: 'home' }]);
-  const [data, setData] = useState<AppData>(() => loadData());
+  const [data, setData] = useState<AppData>(() => (nativeReady ? loadData() : { clips: [], scripts: [], videos: [] }));
   const [isPro, setPro] = useState(false);
   const [price, setPrice] = useState('');
 
   useEffect(() => {
+    if (!nativeReady) return;
     Native.proStatus().then(r => { setPro(r.isPro); setPrice(r.price); }).catch(() => {});
   }, []);
 
@@ -77,6 +78,7 @@ export default function App() {
           <View style={{ width: 70 }} />
         </View>
       )}
+      {!nativeReady && <Text style={{ color: C.red, padding: 12, fontWeight: '700' }}>⚠️ Voice engine not found in this build.</Text>}
       <View style={{ flex: 1 }}>{screen}</View>
     </SafeAreaView>
   );

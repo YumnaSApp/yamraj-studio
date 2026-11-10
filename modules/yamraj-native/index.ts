@@ -1,4 +1,4 @@
-import { requireNativeModule } from 'expo';
+import { requireOptionalNativeModule } from 'expo';
 
 export type HindiVoice = { id: string; name: string; gender: 'male' | 'female' | 'other'; enhanced: boolean };
 export type ExportClip = { path: string; text: string; speaker: string; duration: number };
@@ -38,4 +38,6 @@ type NativeModuleType = {
   addListener(event: 'onExportProgress', listener: (e: { progress: number }) => void): { remove(): void };
 };
 
-export default requireNativeModule<NativeModuleType>('YamrajNative');
+const mod = requireOptionalNativeModule<NativeModuleType>('YamrajNative');
+export const nativeReady = !!mod;
+export default (mod ?? new Proxy({}, { get: () => () => { throw new Error('Voice engine missing in this build'); } })) as NativeModuleType;
