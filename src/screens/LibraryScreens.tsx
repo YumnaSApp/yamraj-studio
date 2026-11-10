@@ -95,7 +95,7 @@ export function ProScreen({ nav, store }: { nav: Nav; store: Store }) {
   return (
     <ScrollView contentContainerStyle={{ padding: 20, gap: 18, alignItems: 'stretch', paddingBottom: 40 }}>
       <Text style={{ fontSize: 70, textAlign: 'center' }}>👑</Text>
-      <Text style={{ color: C.orange, fontSize: 28, fontWeight: '900', textAlign: 'center' }}>YAMRAJ STUDIO PRO</Text>
+      <Text style={{ color: C.orange, fontSize: 28, fontWeight: '900', textAlign: 'center' }}>KK STUDIO PRO</Text>
       <Card>
         {['✅ No watermark on your videos', '✨ All Pro templates (more every update)', '♾️ Unlimited exports – one-time payment', '❤️ Support a made-in-India app'].map(p => (
           <Text key={p} style={[s.text, { fontWeight: '700', fontSize: 17 }]}>{p}</Text>

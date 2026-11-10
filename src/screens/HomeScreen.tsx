@@ -7,8 +7,8 @@ export default function HomeScreen({ nav, store }: { nav: Nav; store: Store }) {
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 18 }}>
       <View style={{ alignItems: 'center', paddingTop: 24, paddingBottom: 8, gap: 6 }}>
-        <Text style={{ fontSize: 54 }}>😈🔥</Text>
-        <Text style={{ color: C.orange, fontSize: 36, fontWeight: '900', textShadowColor: C.red, textShadowRadius: 14 }}>YAMRAJ STUDIO</Text>
+        <Text style={{ fontSize: 54 }}>🎬😂</Text>
+        <Text style={{ color: C.orange, fontSize: 36, fontWeight: '900', textShadowColor: C.red, textShadowRadius: 14 }}>KK STUDIO</Text>
         <Text style={[s.muted, { fontSize: 16, fontWeight: '600' }]}>Funny Voice Shorts Maker</Text>
       </View>
 

@@ -106,7 +106,7 @@ final class ImagePicker: NSObject, PHPickerViewControllerDelegate {
     }
 }
 
-// MARK: - In-app purchase (Yamraj Studio Pro)
+// MARK: - In-app purchase (KK Studio Pro)
 
 @MainActor
 final class ProStore {
@@ -226,8 +226,14 @@ enum VideoInfo {
         gen.appliesPreferredTrackTransform = true
         gen.maximumSize = CGSize(width: 540, height: 960)
         var thumb: String?
-        if let cg = try? await gen.image(at: CMTime(seconds: min(1, duration / 2), preferredTimescale: 600)).image,
-           let data = UIImage(cgImage: cg).jpegData(compressionQuality: 0.8) {
+        let at = CMTime(seconds: min(1, duration / 2), preferredTimescale: 600)
+        var cgImage: CGImage?
+        if #available(iOS 16, *) {
+            cgImage = try? await gen.image(at: at).image
+        } else {
+            cgImage = try? gen.copyCGImage(at: at, actualTime: nil)
+        }
+        if let cg = cgImage, let data = UIImage(cgImage: cg).jpegData(compressionQuality: 0.8) {
             let name = relative + ".jpg"
             if (try? data.write(to: FileStore.documents.appendingPathComponent(name))) != nil { thumb = name }
         }

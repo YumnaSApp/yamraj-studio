@@ -76,7 +76,7 @@ enum VideoExporter {
         let silent = FileStore.temp.appendingPathComponent("silent_\(UUID().uuidString).mp4")
         defer { FileStore.delete(silent) }
         try await renderFrames(settings, to: silent) { progress($0 * 0.8) }
-        let out = FileStore.videos.appendingPathComponent("YamrajStudio_\(Int(Date().timeIntervalSince1970)).mp4")
+        let out = FileStore.videos.appendingPathComponent("KKStudio_\(Int(Date().timeIntervalSince1970)).mp4")
         try await compose(settings, video: silent, to: out)
         progress(1)
         return out
@@ -305,7 +305,7 @@ final class FrameRenderer {
     }
 
     private func drawWatermark() {
-        let a = NSAttributedString(string: "😈 Made with Yamraj Studio", attributes: [
+        let a = NSAttributedString(string: "🎬 Made with KK Studio", attributes: [
             .font: UIFont.systemFont(ofSize: 38, weight: .heavy),
             .foregroundColor: UIColor.white.withAlphaComponent(0.75),
             .strokeColor: UIColor.black.withAlphaComponent(0.6),
