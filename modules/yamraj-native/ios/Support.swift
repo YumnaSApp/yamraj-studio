@@ -111,7 +111,7 @@ final class ImagePicker: NSObject, PHPickerViewControllerDelegate {
 @MainActor
 final class ProStore {
     static let shared = ProStore()
-    static let proID = "com.kamran.yamrajstudio.pro"
+    static let proID = "com.kamran.yamrajstudio.pro.monthly"   // auto-renewable, 1 month
 
     private(set) var isPro = false
     private(set) var product: Product?

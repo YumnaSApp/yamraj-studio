@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import Native from '../../modules/yamraj-native';
 import type { Nav, Store } from '../../App';
 import { TEMPLATES } from '../data';
@@ -97,7 +97,7 @@ export function ProScreen({ nav, store }: { nav: Nav; store: Store }) {
       <Text style={{ fontSize: 70, textAlign: 'center' }}>👑</Text>
       <Text style={{ color: C.orange, fontSize: 28, fontWeight: '900', textAlign: 'center' }}>KK STUDIO PRO</Text>
       <Card>
-        {['✅ No watermark on your videos', '✨ All Pro templates (more every update)', '♾️ Unlimited exports – one-time payment', '❤️ Support a made-in-India app'].map(p => (
+        {['✅ No watermark on your videos', '✨ All Pro templates (more every update)', '♾️ Unlimited exports – cancel anytime', '❤️ Support a made-in-India app'].map(p => (
           <Text key={p} style={[s.text, { fontWeight: '700', fontSize: 17 }]}>{p}</Text>
         ))}
       </Card>
@@ -105,10 +105,18 @@ export function ProScreen({ nav, store }: { nav: Nav; store: Store }) {
         <Text style={{ color: C.yellow, fontWeight: '900', fontSize: 18, textAlign: 'center' }}>✅ You already have Pro</Text>
       ) : (
         <View style={{ flexDirection: 'row' }}>
-          <Btn label={store.price ? `Unlock Pro – ${store.price}` : 'Unlock Pro'} onPress={() => run(() => Native.buyPro())} disabled={busy} />
+          <Btn label={store.price ? `Subscribe – ${store.price} / month` : 'Subscribe monthly'} onPress={() => run(() => Native.buyPro())} disabled={busy} />
         </View>
       )}
       <Pressable onPress={() => run(() => Native.restorePro())}><Text style={{ color: C.orange, fontWeight: '700', textAlign: 'center' }}>Restore Purchase</Text></Pressable>
+      <Text style={[s.muted, { fontSize: 12, textAlign: 'center' }]}>
+        KK Studio Pro is a monthly subscription. Payment is charged to your Apple ID and renews automatically every month unless cancelled at least 24 hours before the end of the period. Manage or cancel anytime in Settings → Apple ID → Subscriptions.
+      </Text>
+      <View style={[s.row, { justifyContent: 'center' }]}>
+        <Pressable onPress={() => Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}><Text style={{ color: C.orange, fontSize: 13 }}>Terms of Use</Text></Pressable>
+        <Text style={s.muted}>·</Text>
+        <Pressable onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')}><Text style={{ color: C.orange, fontSize: 13 }}>Manage subscription</Text></Pressable>
+      </View>
       {busy && <ActivityIndicator color={C.orange} />}
       {!!msg && <Text style={{ color: C.yellow, textAlign: 'center' }}>{msg}</Text>}
     </ScrollView>
