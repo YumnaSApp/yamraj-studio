@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import Native, { HindiVoice } from '../../modules/yamraj-native';
 import type { Nav, Store } from '../../App';
-import { Line, matchPreset, parseScript, Preset, PRESETS, uid } from '../data';
+import { Line, matchPreset, parseScript, Preset, PRESETS, uid, unknownIndexes } from '../data';
 import { Btn, C, Card, Chip, s, Stepper, Title, Toggle } from '../ui';
 
 export default function VoiceMakerScreen({ nav, store, initialText }: { nav: Nav; store: Store; initialText?: string }) {
@@ -19,11 +19,12 @@ export default function VoiceMakerScreen({ nav, store, initialText }: { nav: Nav
   const voices = useMemo<HindiVoice[]>(() => { try { return Native.hindiVoices(); } catch { return []; } }, []);
   const lines = useMemo(() => parseScript(text), [text]);
   const multi = lines.length > 1;
+  const unknown = useMemo(() => unknownIndexes(lines), [lines]);
 
   const apply = (p: Preset) => { setPreset(p); setPitch(p.pitch); setRate(p.rate); setEcho(p.echo); };
 
   const settingsFor = (line: Line) => {
-    const p = multi ? matchPreset(line.speaker) : undefined;
+    const p = multi ? matchPreset(line.speaker, unknown[line.speaker.toLowerCase().trim()] ?? 0) : undefined;
     return p ? { pitch: p.pitch, rate: p.rate, echo: p.echo, preferMale: p.preferMale }
              : { pitch, rate, echo, preferMale: preset.preferMale };
   };
@@ -104,18 +105,19 @@ export default function VoiceMakerScreen({ nav, store, initialText }: { nav: Nav
       </Card>
 
       <Card>
-        <Title>VOICE</Title>
-        <View style={s.row}>
+        <Title>CHARACTER VOICE ({PRESETS.length})</Title>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
           {PRESETS.map(p => (
             <Pressable key={p.id} onPress={() => apply(p)} style={{
-              flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 16,
+              width: 96, alignItems: 'center', paddingVertical: 14, borderRadius: 16,
               backgroundColor: preset.id === p.id ? C.red : C.card2,
             }}>
-              <Text style={{ fontSize: 34 }}>{p.emoji}</Text>
-              <Text style={{ color: '#fff', fontWeight: '800', marginTop: 4 }}>{p.name}</Text>
+              <Text style={{ fontSize: 32 }}>{p.emoji}</Text>
+              <Text style={{ color: '#fff', fontWeight: '800', marginTop: 4, fontSize: 13 }}>{p.name}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
+        <Text style={[s.muted, { fontSize: 13 }]}>Writing "Name: line"? Each name gets its own voice automatically – Mummy, Papa, Pappu, Bhoot, Police, any name.</Text>
         {voices.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             <Chip label="Auto (best)" active={voiceId === null} onPress={() => setVoiceId(null)} />
