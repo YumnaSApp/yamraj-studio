@@ -122,17 +122,20 @@ enum VideoExporter {
             CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pbOut)
             guard let pb = pbOut else { throw ExportError.writer("no pixel buffer") }
 
-            CVPixelBufferLockBaseAddress(pb, [])
-            if let ctx = CGContext(data: CVPixelBufferGetBaseAddress(pb),
-                                   width: Int(size.width), height: Int(size.height),
-                                   bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(pb),
-                                   space: CGColorSpaceCreateDeviceRGB(),
-                                   bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) {
-                renderer.draw(time: Double(f) / Double(fps), in: ctx)
+            // autoreleasepool frees each frame's images right away (otherwise memory grows until iOS kills the app)
+            let ok: Bool = autoreleasepool {
+                CVPixelBufferLockBaseAddress(pb, [])
+                if let ctx = CGContext(data: CVPixelBufferGetBaseAddress(pb),
+                                       width: Int(size.width), height: Int(size.height),
+                                       bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(pb),
+                                       space: CGColorSpaceCreateDeviceRGB(),
+                                       bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) {
+                    renderer.draw(time: Double(f) / Double(fps), in: ctx)
+                }
+                CVPixelBufferUnlockBaseAddress(pb, [])
+                return adaptor.append(pb, withPresentationTime: CMTime(value: CMTimeValue(f), timescale: fps))
             }
-            CVPixelBufferUnlockBaseAddress(pb, [])
-
-            if !adaptor.append(pb, withPresentationTime: CMTime(value: CMTimeValue(f), timescale: fps)) {
+            if !ok {
                 throw ExportError.writer(writer.error?.localizedDescription ?? "append failed")
             }
             if f % 10 == 0 { progress(Double(f) / Double(frameCount)) }
@@ -509,9 +512,15 @@ final class VideoFrameSource {
             guard let sb = pending else { break }
             let pts = CMSampleBufferGetPresentationTimeStamp(sb).seconds
             if pts > local + 0.0001, current != nil { break }
-            if let pb = CMSampleBufferGetImageBuffer(sb) {
-                let img = CIImage(cvPixelBuffer: pb).oriented(orientation)
-                if let cg = ci.createCGImage(img, from: img.extent) { current = cg }
+            autoreleasepool {
+                if let pb = CMSampleBufferGetImageBuffer(sb) {
+                    var img = CIImage(cvPixelBuffer: pb).oriented(orientation)
+                    // shrink 4K / big frames to about 1080 wide before converting (saves lots of memory)
+                    let maxSide: CGFloat = 1920
+                    let scale = min(1, maxSide / max(img.extent.width, img.extent.height))
+                    if scale < 0.999 { img = img.transformed(by: CGAffineTransform(scaleX: scale, y: scale)) }
+                    if let cg = ci.createCGImage(img, from: img.extent) { current = cg }
+                }
             }
             pending = nil
         }
