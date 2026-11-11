@@ -1,7 +1,7 @@
 import { requireOptionalNativeModule } from 'expo';
 
 export type HindiVoice = { id: string; name: string; gender: 'male' | 'female' | 'other'; enhanced: boolean };
-export type ExportClip = { path: string; text: string; speaker: string; duration: number; start?: number };
+export type ExportClip = { path: string; text: string; speaker: string; duration: number; start?: number; emoji?: string };
 export type ExportOptions = {
   image?: string | null;
   video?: string | null;

@@ -107,7 +107,8 @@ public class YamrajNativeModule: Module {
                                   text: c["text"] as? String ?? "",
                                   speaker: c["speaker"] as? String ?? "",
                                   duration: (c["duration"] as? NSNumber)?.doubleValue ?? 1,
-                                  start: (c["start"] as? NSNumber)?.doubleValue)
+                                  start: (c["start"] as? NSNumber)?.doubleValue,
+                                  emoji: c["emoji"] as? String ?? "")
             }
             var s = ExportSettings(image: image, clips: clips)
             s.music = MusicKind(rawValue: options["music"] as? String ?? "None") ?? .none

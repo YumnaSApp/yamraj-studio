@@ -5,12 +5,14 @@ import Native, { nativeReady } from './modules/yamraj-native';
 import { AppData, loadData, saveData } from './src/data';
 import { C } from './src/ui';
 import HomeScreen from './src/screens/HomeScreen';
+import AutoVideoScreen from './src/screens/AutoVideoScreen';
 import VoiceMakerScreen from './src/screens/VoiceMakerScreen';
 import VideoEditorScreen from './src/screens/VideoEditorScreen';
 import { TemplatesScreen, ScriptsScreen, VideosScreen, ProScreen } from './src/screens/LibraryScreens';
 
 export type Route =
   | { name: 'home' }
+  | { name: 'auto' }
   | { name: 'voice'; text?: string }
   | { name: 'editor' }
   | { name: 'templates' }
@@ -19,7 +21,7 @@ export type Route =
   | { name: 'pro' };
 
 const TITLES: Record<Route['name'], string> = {
-  home: '', voice: 'Voice Maker', editor: 'Video Editor', templates: 'Templates',
+  home: '', auto: '⚡ Script → Video', voice: 'Voice Maker', editor: 'Video Editor', templates: 'Templates',
   scripts: 'My Scripts', videos: 'My Videos', pro: 'Go Pro 👑',
 };
 
@@ -58,6 +60,7 @@ export default function App() {
   let screen: React.ReactNode;
   switch (route.name) {
     case 'home': screen = <HomeScreen nav={nav} store={store} />; break;
+    case 'auto': screen = <AutoVideoScreen nav={nav} store={store} />; break;
     case 'voice': screen = <VoiceMakerScreen key={stack.length} nav={nav} store={store} initialText={route.text} />; break;
     case 'editor': screen = <VideoEditorScreen nav={nav} store={store} />; break;
     case 'templates': screen = <TemplatesScreen nav={nav} store={store} />; break;

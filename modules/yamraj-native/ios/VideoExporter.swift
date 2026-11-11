@@ -8,6 +8,7 @@ struct ExportClip: Hashable {
     let speaker: String
     let duration: Double
     var start: Double? = nil      // manual start time on the timeline (seconds)
+    var emoji: String = ""        // character face shown on screen (auto video)
 }
 
 struct SFXCue: Identifiable, Hashable {
@@ -302,6 +303,7 @@ final class FrameRenderer {
             ctx.drawLinearGradient(g, start: CGPoint(x: 0, y: size.height * 0.55), end: CGPoint(x: 0, y: size.height), options: [])
         }
 
+        if s.image == nil && s.videoURL == nil { drawCharacter(at: t) }
         if !s.hookText.isEmpty { drawHook() }
         if s.captions { drawCaption(at: t) }
         if s.watermark { drawWatermark() }
@@ -316,6 +318,25 @@ final class FrameRenderer {
         ])
         let sz = a.size()
         a.draw(at: CGPoint(x: size.width - sz.width - 36, y: size.height * 0.26))
+    }
+
+    /// Big character face for whoever is talking (used when there is no photo/video)
+    private func drawCharacter(at t: Double) {
+        guard let idx = starts.indices.last(where: { starts[$0] <= t + 0.05 }) else { return }
+        let clip = s.clips[idx]
+        guard !clip.emoji.isEmpty else { return }
+        let local = max(0, t - starts[idx])
+        let pop = 1.0 + 0.15 * max(0, 1 - local / 0.2)            // pops in when they start talking
+        let talking = local <= clip.duration
+        let bob = talking ? 12 * sin(local * 14) : 0               // little bounce while speaking
+        let side = 560 * pop
+        let rect = CGRect(x: (size.width - side) / 2, y: size.height * 0.36 - side / 2 + bob, width: side, height: side)
+        // glow circle
+        UIColor(red: 1, green: 0.55, blue: 0.1, alpha: 0.25).setFill()
+        UIBezierPath(ovalIn: rect.insetBy(dx: -40, dy: -40)).fill()
+        let a = NSAttributedString(string: clip.emoji, attributes: [.font: UIFont.systemFont(ofSize: side * 0.8)])
+        let sz = a.size()
+        a.draw(at: CGPoint(x: rect.midX - sz.width / 2, y: rect.midY - sz.height / 2))
     }
 
     private func drawHook() {
