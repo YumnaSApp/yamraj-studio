@@ -18,6 +18,9 @@ export type ExportOptions = {
   endCard: boolean;
   endCardHandle: string;
   watermark: boolean;
+  videoStart?: number;
+  captionColor?: string;
+  overlays?: { text: string; start: number; end: number; y: number; size: number }[];
 };
 
 type NativeModuleType = {
@@ -28,7 +31,11 @@ type NativeModuleType = {
   hindiVoices(): HindiVoice[];
   speak(text: string, pitch: number, rate: number, voiceId: string | null, preferMale: boolean): void;
   stopSpeaking(): void;
-  renderSpeech(text: string, pitch: number, rate: number, voiceId: string | null, preferMale: boolean, echo: boolean): Promise<{ path: string; duration: number }>;
+  renderSpeech(text: string, pitch: number, rate: number, voiceId: string | null, preferMale: boolean, echo: boolean, effect?: string | null): Promise<{ path: string; duration: number }>;
+  startRecording(): Promise<boolean>;
+  downloadFile(url: string, ext: string): Promise<string>;
+  joinVideos(paths: string[]): Promise<{ path: string; duration: number }>;
+  stopRecording(effect?: string | null): Promise<{ path: string; duration: number } | null>;
   playFile(path: string): void;
   stopPlayback(): void;
   playMusic(kind: string): Promise<void>;

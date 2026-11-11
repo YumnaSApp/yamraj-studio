@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import Native, { HindiVoice } from '../../modules/yamraj-native';
 import type { Nav, Store } from '../../App';
-import { Line, matchPreset, parseScript, Preset, PRESETS, uid, unknownIndexes } from '../data';
+import { EFFECTS, Line, matchPreset, parseScript, Preset, PRESETS, uid, unknownIndexes } from '../data';
 import { Btn, C, Card, Chip, s, Stepper, Title, Toggle } from '../ui';
 
 export default function VoiceMakerScreen({ nav, store, initialText }: { nav: Nav; store: Store; initialText?: string }) {
@@ -15,6 +15,27 @@ export default function VoiceMakerScreen({ nav, store, initialText }: { nav: Nav
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [playing, setPlaying] = useState<string | null>(null);
+  const [effect, setEffect] = useState('');
+  const [recording, setRecording] = useState(false);
+
+  const pickEffect = (id: string, pro: boolean) => { if (pro && !store.isPro) { nav.push({ name: 'pro' }); return; } setEffect(id); };
+
+  const toggleRecord = async () => {
+    try {
+      if (!recording) {
+        Native.stopPlayback();
+        const ok = await Native.startRecording();
+        if (!ok) { setMsg('⚠️ Allow microphone: Settings → KK Studio → Microphone.'); return; }
+        setRecording(true); setMsg('🔴 Recording… tap again to stop.');
+      } else {
+        setRecording(false);
+        const r = await Native.stopRecording(effect);
+        if (!r) return;
+        store.update(d => ({ ...d, clips: [...d.clips, { id: uid(), text: '🎙 My voice', speaker: 'Me', path: r.path, duration: r.duration, createdAt: Date.now() }] }));
+        setMsg(`✅ Recorded ${r.duration.toFixed(1)}s. Saved below.`);
+      }
+    } catch (e: any) { setRecording(false); setMsg('⚠️ ' + (e?.message ?? String(e))); }
+  };
 
   const voices = useMemo<HindiVoice[]>(() => { try { return Native.hindiVoices(); } catch { return []; } }, []);
   const lines = useMemo(() => parseScript(text), [text]);
@@ -48,7 +69,7 @@ export default function VoiceMakerScreen({ nav, store, initialText }: { nav: Nav
         setMsg(`Saving ${i + 1} of ${lines.length}…`);
         const l = lines[i];
         const v = settingsFor(l);
-        const r = await Native.renderSpeech(l.text, v.pitch, v.rate, voiceId, v.preferMale, v.echo);
+        const r = await Native.renderSpeech(l.text, v.pitch, v.rate, voiceId, v.preferMale, v.echo, effect);
         made.push({ id: uid(), text: l.text, speaker: l.speaker || (multi ? '' : preset.name), path: r.path, duration: r.duration, createdAt: Date.now() + i });
       }
       store.update(d => ({ ...d, clips: [...d.clips, ...made] }));
@@ -134,6 +155,18 @@ export default function VoiceMakerScreen({ nav, store, initialText }: { nav: Nav
         <Stepper label="Pitch (deep ↔ high)" value={pitch} min={0.5} max={1.5} step={0.05} onChange={setPitch} />
         <Stepper label="Speed (slow ↔ fast)" value={rate} min={0.3} max={0.8} step={0.05} onChange={setRate} />
         <Toggle label="Echo (Yamraj god effect)" value={echo} onChange={setEcho} />
+        <Text style={[s.text, { fontWeight: '700' }]}>Voice effect</Text>
+        <View style={[s.row, { flexWrap: 'wrap' }]}>
+          {EFFECTS.map(e => <Chip key={e.id || 'none'} label={e.label + (e.pro && !store.isPro ? ' 👑' : '')} active={effect === e.id} onPress={() => pickEffect(e.id, e.pro)} />)}
+        </View>
+      </Card>
+
+      <Card>
+        <Title>🎙 RECORD YOUR OWN VOICE</Title>
+        <View style={{ flexDirection: 'row' }}>
+          <Btn label={recording ? '⏹ Stop Recording' : '🔴 Record'} onPress={toggleRecord} />
+        </View>
+        <Text style={[s.muted, { fontSize: 13 }]}>The voice effect above is added to your recording too.</Text>
       </Card>
 
       <View style={s.row}>

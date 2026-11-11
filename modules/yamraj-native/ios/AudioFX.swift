@@ -41,13 +41,41 @@ enum AudioFX {
     }
 
     /// Trim silence, optional echo, normalise. Returns duration.
-    static func process(input: URL, output: URL, echo: Bool) throws -> Double {
+    static func process(input: URL, output: URL, echo: Bool, effect: String = "") throws -> Double {
         var (s, sr) = try readMono(input)
         s = trimSilence(s, sampleRate: sr)
+        s = applyEffect(s, sampleRate: sr, effect: effect)
         if echo { s = addEcho(s, sampleRate: sr) }
         s = normalize(s, peak: 0.95)
         try writeMono(s, sampleRate: sr, to: output)
         return Double(s.count) / sr
+    }
+
+    /// Funny voice effects: robot, radio, cave
+    static func applyEffect(_ input: [Float], sampleRate sr: Double, effect: String) -> [Float] {
+        switch effect {
+        case "robot":
+            var out = input
+            for i in 0..<out.count {
+                let t = Double(i) / sr
+                out[i] = input[i] * Float(sin(2 * .pi * 55 * t)) * 1.3 + input[i] * 0.25
+            }
+            return addEcho(out, sampleRate: sr, delay: 0.03, feedback: 0.4, tail: 0.2)
+        case "radio":
+            var out = [Float](repeating: 0, count: input.count)
+            var lp: Float = 0, hpPrev: Float = 0, hpOut: Float = 0
+            for i in 0..<input.count {
+                lp += 0.35 * (input[i] - lp)                 // cut highs
+                hpOut = 0.92 * (hpOut + lp - hpPrev)          // cut lows
+                hpPrev = lp
+                out[i] = Float(tanh(Double(hpOut) * 3))       // a bit of crunch
+            }
+            return out
+        case "cave":
+            return addEcho(input, sampleRate: sr, delay: 0.28, feedback: 0.5, tail: 1.6)
+        default:
+            return input
+        }
     }
 
     static func trimSilence(_ s: [Float], sampleRate: Double, threshold: Float = 0.01) -> [Float] {

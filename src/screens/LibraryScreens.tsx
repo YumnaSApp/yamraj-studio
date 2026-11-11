@@ -97,7 +97,7 @@ export function ProScreen({ nav, store }: { nav: Nav; store: Store }) {
       <Text style={{ fontSize: 70, textAlign: 'center' }}>👑</Text>
       <Text style={{ color: C.orange, fontSize: 28, fontWeight: '900', textAlign: 'center' }}>KK STUDIO PRO</Text>
       <Card>
-        {['✅ No watermark on your videos', '✨ All Pro templates (more every update)', '♾️ Unlimited exports – cancel anytime', '❤️ Support a made-in-India app'].map(p => (
+        {['🤖 AI video scenes (like Tung Tung Shorts)', '✅ No watermark on your videos', '♾️ Unlimited exports (free: 3 per day)', '🤖 Robot & 📻 Radio voice effects', '😂 Stickers & text on video', '✨ All Pro templates – cancel anytime'].map(p => (
           <Text key={p} style={[s.text, { fontWeight: '700', fontSize: 17 }]}>{p}</Text>
         ))}
       </Card>

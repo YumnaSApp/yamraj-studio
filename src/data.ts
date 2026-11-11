@@ -4,7 +4,29 @@ import Native from '../modules/yamraj-native';
 export type VoiceClip = { id: string; text: string; speaker: string; path: string; duration: number; createdAt: number };
 export type Script = { id: string; title: string; text: string; createdAt: number };
 export type Video = { id: string; title: string; path: string; duration: number; createdAt: number };
-export type AppData = { clips: VoiceClip[]; scripts: Script[]; videos: Video[] };
+export type AppData = { clips: VoiceClip[]; scripts: Script[]; videos: Video[]; usage?: { day: string; count: number }; ai?: { day: string; count: number } };
+export const aiLeft = (d: AppData, perDay: number) => perDay - (d.ai?.day === new Date().toISOString().slice(0, 10) ? d.ai.count : 0);
+export const countAI = (d: AppData): AppData => { const day = new Date().toISOString().slice(0, 10); return { ...d, ai: { day, count: (d.ai?.day === day ? d.ai.count : 0) + 1 } }; };
+
+// ---------- free plan: 3 exports per day ----------
+export const FREE_PER_DAY = 3;
+const today = () => new Date().toISOString().slice(0, 10);
+export const exportsLeft = (d: AppData) => FREE_PER_DAY - (d.usage?.day === today() ? d.usage.count : 0);
+export const countExport = (d: AppData): AppData => ({ ...d, usage: { day: today(), count: (d.usage?.day === today() ? d.usage.count : 0) + 1 } });
+
+export const EFFECTS = [
+  { id: '', label: '🙂 Normal', pro: false },
+  { id: 'cave', label: '🏔 Cave Echo', pro: false },
+  { id: 'robot', label: '🤖 Robot', pro: true },
+  { id: 'radio', label: '📻 Radio', pro: true },
+];
+
+export const CAPTION_COLORS = [
+  { hex: '#FFD90D', label: '💛 Yellow' }, { hex: '#FFFFFF', label: '🤍 White' }, { hex: '#3DFF6E', label: '💚 Green' },
+  { hex: '#FF3B3B', label: '❤️ Red' }, { hex: '#38D6FF', label: '💙 Blue' }, { hex: '#FF6BD6', label: '🩷 Pink' },
+];
+
+export const STICKERS = ['😂', '🤣', '💀', '🔥', '😱', '🤡', '👻', '😡', '💯', 'WTF 😳', 'BRUH 💀', 'EPIC 🔥'];
 
 export const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
@@ -206,7 +228,7 @@ export const MUSIC = [
 ] as const;
 
 export const SFX = [
-  { id: 'Dham', emoji: '🥁' },
-  { id: 'Record Scratch', emoji: '💿' },
-  { id: 'Audience Laugh', emoji: '😂' },
+  { id: 'Dham', emoji: '🥁', label: 'Tun Tun' },
+  { id: 'Record Scratch', emoji: '💿', label: 'Scratch' },
+  { id: 'Audience Laugh', emoji: '😂', label: 'Laugh' },
 ] as const;

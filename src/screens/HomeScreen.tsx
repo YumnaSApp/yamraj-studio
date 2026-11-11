@@ -12,7 +12,7 @@ export default function HomeScreen({ nav, store }: { nav: Nav; store: Store }) {
         <Text style={[s.muted, { fontSize: 16, fontWeight: '600' }]}>Funny Voice Shorts Maker</Text>
       </View>
 
-      <BigBtn title="Script → Video" subtitle="Paste script, one tap, video ready ⚡" icon="⚡" onPress={() => nav.push({ name: 'auto' })} />
+      <BigBtn title="Script → Video" subtitle="Paste script, one tap – AI video ready 🤖" icon="⚡" onPress={() => nav.push({ name: 'auto' })} />
       <BigBtn title="Edit My Video" subtitle="Your clip + funny voiceovers" icon="🎬" onPress={() => nav.push({ name: 'voice' })} />
       <BigBtn title="My Scripts" subtitle={`${store.data.scripts.length} saved dialogues`} icon="📜" onPress={() => nav.push({ name: 'scripts' })} />
       <BigBtn title="My Videos" subtitle={`${store.data.videos.length} exported Shorts`} icon="📱" onPress={() => nav.push({ name: 'videos' })} />

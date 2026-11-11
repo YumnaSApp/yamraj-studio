@@ -14,7 +14,8 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Pick a picture for your Short",
         "NSPhotoLibraryAddUsageDescription": "Save your Shorts to Photos",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "KK Studio uses the microphone so you can record your own funny voiceover."
       }
     },
     "android": {

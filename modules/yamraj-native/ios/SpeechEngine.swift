@@ -82,11 +82,11 @@ final class SpeechRenderer {
 
     /// Writes raw speech, then cleans it (trim, normalise, optional echo) into `output` (.caf).
     /// Returns the duration in seconds.
-    func render(_ utterance: AVSpeechUtterance, to output: URL, echo: Bool) async throws -> Double {
+    func render(_ utterance: AVSpeechUtterance, to output: URL, echo: Bool, effect: String = "") async throws -> Double {
         let raw = FileStore.temp.appendingPathComponent(UUID().uuidString + ".caf")
         defer { FileStore.delete(raw) }
         try await writeRaw(utterance, to: raw)
-        return try AudioFX.process(input: raw, output: output, echo: echo)
+        return try AudioFX.process(input: raw, output: output, echo: echo, effect: effect)
     }
 
     private func writeRaw(_ utterance: AVSpeechUtterance, to url: URL) async throws {

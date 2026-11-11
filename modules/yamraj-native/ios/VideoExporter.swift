@@ -11,6 +11,14 @@ struct ExportClip: Hashable {
     var emoji: String = ""        // character face shown on screen (auto video)
 }
 
+struct TextOverlay {
+    var text: String
+    var start: Double
+    var end: Double
+    var y: Double          // 0 = top, 1 = bottom
+    var size: Double
+}
+
 struct SFXCue: Identifiable, Hashable {
     var id = UUID()
     var kind: SFXKind
@@ -34,6 +42,9 @@ struct ExportSettings {
     var videoURL: URL? = nil      // user's own video as background
     var videoDuration: Double = 0
     var videoVolume: Float = 0.5
+    var videoStart: Double = 0         // trim: start of the user's video (seconds)
+    var captionColor: UIColor = UIColor(red: 1, green: 0.85, blue: 0.05, alpha: 1)
+    var overlays: [TextOverlay] = []   // stickers / emoji text
 
     static let leadIn = 0.3
     static let tail = 0.6
@@ -110,7 +121,7 @@ enum VideoExporter {
         writer.startSession(atSourceTime: .zero)
 
         var videoSource: VideoFrameSource? = nil
-        if let v = s.videoURL { videoSource = try await VideoFrameSource.make(url: v) }
+        if let v = s.videoURL { videoSource = try await VideoFrameSource.make(url: v, start: s.videoStart, length: s.videoDuration) }
         let renderer = FrameRenderer(settings: s, size: size, video: videoSource)
         let frameCount = Int((s.totalLength * Double(fps)).rounded(.up))
 
@@ -160,18 +171,21 @@ enum VideoExporter {
 
         var params: [AVMutableAudioMixInputParameters] = []
 
-        func addAudio(_ url: URL, at start: Double, volume: Float, loop: Bool = false, fadeOut: Bool = false) async throws {
+        func addAudio(_ url: URL, at start: Double, volume: Float, loop: Bool = false, fadeOut: Bool = false,
+                      from: Double = 0, length: Double? = nil) async throws {
             let asset = AVURLAsset(url: url)
             guard let src = try await asset.loadTracks(withMediaType: .audio).first,
                   let track = comp.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
             else { return }
-            let len = try await asset.load(.duration).seconds
+            let full = try await asset.load(.duration).seconds
+            let len = min(length ?? (full - from), full - from)
             guard len > 0.01 else { return }
             var t = start
             repeat {
                 let piece = min(len, total - t)
                 if piece <= 0.01 { break }
-                try track.insertTimeRange(CMTimeRange(start: .zero, duration: CMTime(seconds: piece, preferredTimescale: 600)),
+                try track.insertTimeRange(CMTimeRange(start: CMTime(seconds: from, preferredTimescale: 600),
+                                                      duration: CMTime(seconds: piece, preferredTimescale: 600)),
                                           of: src, at: CMTime(seconds: t, preferredTimescale: 600))
                 t += piece
             } while loop && t < total - 0.01
@@ -187,7 +201,8 @@ enum VideoExporter {
 
         // original sound of the user's video (looped under the content)
         if let v = s.videoURL, s.videoVolume > 0.001 {
-            try await addAudio(v, at: 0, volume: s.videoVolume, loop: true, fadeOut: false)
+            try await addAudio(v, at: 0, volume: s.videoVolume, loop: true, fadeOut: false,
+                               from: s.videoStart, length: s.videoDuration)
         }
         // voices
         for (clip, start) in zip(s.clips, s.clipStarts) {
@@ -283,6 +298,16 @@ final class FrameRenderer {
             return
         }
 
+        // 🥁 "dun dun" — zoom + shake on every Dham sound
+        let hit = dramaticAmount(at: t)
+        ctx.saveGState()
+        if hit > 0.001 {
+            let z = 1 + 0.22 * hit
+            let shakeX = CGFloat(sin(t * 90) * 22 * hit), shakeY = CGFloat(cos(t * 77) * 16 * hit)
+            ctx.translateBy(x: size.width / 2 + shakeX, y: size.height / 2 + shakeY)
+            ctx.scaleBy(x: z, y: z)
+            ctx.translateBy(x: -size.width / 2, y: -size.height / 2)
+        }
         if let video, let frame = video.image(at: t) {
             // user's video, aspect-fill into 9:16
             let iw = CGFloat(frame.width), ih = CGFloat(frame.height)
@@ -304,9 +329,38 @@ final class FrameRenderer {
         }
 
         if s.image == nil && s.videoURL == nil { drawCharacter(at: t) }
+        ctx.restoreGState()
+        if hit > 0.001 {   // red flash
+            UIColor(red: 0.9, green: 0, blue: 0, alpha: CGFloat(0.35 * hit)).setFill()
+            UIRectFillUsingBlendMode(CGRect(origin: .zero, size: size), .normal)
+        }
         if !s.hookText.isEmpty { drawHook() }
         if s.captions { drawCaption(at: t) }
+        drawOverlays(at: t)
         if s.watermark { drawWatermark() }
+    }
+
+    private lazy var dhamTimes: [Double] = s.sfx.filter { $0.kind == .dham }.map { $0.time }
+
+    /// 0…1 strength of the dramatic hit at time t (three quick hits like "dun dun dun")
+    private func dramaticAmount(at t: Double) -> Double {
+        var best = 0.0
+        for d in dhamTimes {
+            for hitTime in [d, d + 0.42, d + 0.84] {
+                let dt = t - hitTime
+                if dt >= 0 && dt < 0.4 { best = max(best, exp(-dt * 7)) }
+            }
+        }
+        return best
+    }
+
+    private func drawOverlays(at t: Double) {
+        for o in s.overlays where t >= o.start && t <= o.end {
+            let age = t - o.start
+            let pop = 1.0 + 0.25 * max(0, 1 - age / 0.15)
+            _ = drawText(o.text, font: .systemFont(ofSize: CGFloat(o.size * pop), weight: .black), color: .white,
+                         in: CGRect(x: 40, y: CGFloat(o.y) * size.height - CGFloat(o.size) / 2, width: size.width - 80, height: CGFloat(o.size) * 3))
+        }
     }
 
     private func drawWatermark() {
@@ -370,7 +424,7 @@ final class FrameRenderer {
             let isNow = groupStart + i == current
             text.append(NSAttributedString(string: (i > 0 ? " " : "") + w.word, attributes: [
                 .font: font,
-                .foregroundColor: isNow ? UIColor(red: 1, green: 0.85, blue: 0.05, alpha: 1) : UIColor.white,
+                .foregroundColor: isNow ? s.captionColor : UIColor.white,
                 .strokeColor: UIColor.black,
                 .strokeWidth: -7,
                 .paragraphStyle: para,
@@ -496,16 +550,21 @@ final class VideoFrameSource {
         }
     }
 
+    private var offset: Double = 0
+
     private init(asset: AVURLAsset, track: AVAssetTrack, transform: CGAffineTransform, duration: Double) {
         self.asset = asset; self.track = track; self.transform = transform; self.duration = duration
     }
 
-    static func make(url: URL) async throws -> VideoFrameSource? {
+    static func make(url: URL, start: Double = 0, length: Double = 0) async throws -> VideoFrameSource? {
         let asset = AVURLAsset(url: url)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { return nil }
         let transform = try await track.load(.preferredTransform)
-        let duration = try await asset.load(.duration).seconds
-        let src = VideoFrameSource(asset: asset, track: track, transform: transform, duration: duration)
+        let full = try await asset.load(.duration).seconds
+        let st = max(0, min(start, full - 0.1))
+        let len = length > 0.05 ? min(length, full - st) : full - st
+        let src = VideoFrameSource(asset: asset, track: track, transform: transform, duration: len)
+        src.offset = st
         try src.restart()
         return src
     }
@@ -518,6 +577,8 @@ final class VideoFrameSource {
         ])
         o.alwaysCopiesSampleData = false
         if r.canAdd(o) { r.add(o) }
+        r.timeRange = CMTimeRange(start: CMTime(seconds: offset, preferredTimescale: 600),
+                                  duration: CMTime(seconds: duration, preferredTimescale: 600))
         r.startReading()
         reader = r; output = o; pending = nil
     }
@@ -525,7 +586,7 @@ final class VideoFrameSource {
     /// Frame to show at timeline time t (seconds).
     func image(at t: Double) -> CGImage? {
         guard duration > 0.05 else { return current }
-        let local = t.truncatingRemainder(dividingBy: duration)
+        let local = offset + t.truncatingRemainder(dividingBy: duration)
         if local < lastLocal { try? restart() }      // looped
         lastLocal = local
         while true {
